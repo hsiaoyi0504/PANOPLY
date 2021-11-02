@@ -8,6 +8,8 @@ suppressPackageStartupMessages(library("optparse"))
 
 #Rscript c:\Users\karsten\Dropbox\Devel\PANOPLY\src\pgdac_mo_nmf\mo-nmf.r -y lscc-v3.0-param.yaml -n 3 -z c:\Users\karsten\Dropbox\Devel\PANOPLY\src\pgdac_mo_nmf\ -t data\lscc-v3.0-prot-psty-ack-rna-cnv.tar
 
+# commandArgs <- function(...) c("-y", "panoply_rare_rcc_parameters_quick.yml", "-n", "50", "-z", "/home/yihsiao/PANOPLY/src/panoply_mo_nmf/", "-t", "/home/yihsiao/ccRCC-nCCRCC/rare_rcc_rna_prot_phospho.tar")
+
 # specify command line arguments
 option_list <- list(
   make_option( c("-t", "--tar"), action='store', type='character',  dest='tar_file', help='tar file containing data tables in GCT v1.3 format.'),
@@ -58,7 +60,10 @@ parse_yaml_mo_nmf <- function(cmd_option_list,
   
   ## #########################################################
   # parse command line parameters
-  opt_cmd <- parse_args( OptionParser(option_list=cmd_option_list) )
+  opt_cmd <- parse_args( OptionParser(option_list=cmd_option_list))
+  opt_cmd <- parse_args( OptionParser(option_list=cmd_option_list), commandArgs(trailingOnly = TRUE))
+  print("opt_cmddddddd")
+  print(opt_cmd)
   # opt_cmd$yaml_file <- "c:/Users/karsten/Dropbox/Devel/PANOPLY/hydrant/tasks/configs/panoply-parameters-MASTER.yaml"
   ############################################################
   ## parse yaml file
@@ -205,7 +210,9 @@ p_load(magrittr)
 p_load(limma)
 
 ## parse parameters
-opt <- parse_yaml_mo_nmf(option_list) 
+opt <- parse_yaml_mo_nmf(option_list)
+print("opttttttt")
+print(opt)
 #opt$lib_dir <- 'c:/Users/karsten/Dropbox/Devel/PANOPLY/src/panoply_mo_nmf/'
 #opt$organism <- 'human'
 #opt$blank_anno <- 'N/A'

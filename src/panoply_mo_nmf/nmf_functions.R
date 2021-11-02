@@ -2,6 +2,8 @@
 # Copyright (c) 2020 The Broad Institute, Inc. All rights reserved.
 #
 
+options(expression = 500000)
+
 ###########################################
 ## returns 'topn.rank' no. of clusters
 ## with max. 'metric'-scores
@@ -626,7 +628,7 @@ make.non.negative <- function(m){
 MyComplexHeatmap <- function(m, cdesc, cdesc.color, class.variable, variable.other, max.val=NULL, 
                              symm.col=T, ## symmetric color scale centered at zero
                              ##row_title='', 
-                             name='NMF features'){
+                             name='NMF features', jitter=FALSE){
   library(pacman)  
   p_load(circlize)
   p_load(ComplexHeatmap)
@@ -699,7 +701,8 @@ MyComplexHeatmap <- function(m, cdesc, cdesc.color, class.variable, variable.oth
                   name=name,
                   show_row_names = F,
                   show_column_names = F,
-                  use_raster = FALSE)##,
+                  use_raster = FALSE,
+                  jitter=jitter)##,
                  ## row_title=row_title)
     
     return(list(hm.anno=hm, hm.noanno=hm.noanno))
@@ -717,16 +720,15 @@ MyPheatMap <- function(m, cdesc, cdesc.color, rdesc=NULL, class.variable, variab
     m[m > m.max] <- m.max
     m[m < -m.max] <- -m.max
   }
-
   if(min(m, na.rm=T) < 0)
     breaks <- seq(-m.max, m.max, length.out=12)
   else
-    breaks <- NULL
-
+    breaks <- NA
     #breaks <- seq(0, m.max, length.out=12)
   #pheatmap(m, scale='none', annotation_row = rdesc.feat, annotation_col=cdesc[ , rev(c(class.variable, variable.other))], annotation_colors=cdesc.color,
   #         cluster_cols = F, cluster_rows=F, filename='6.0_heatmap_ALL_features.pdf', show_rownames=F, breaks=seq(-m.max, m.max, length.out=12), color=rev(brewer.pal (11, "RdBu")), cellwidth = cw)
   ## sort
+  # browser()
   pheatmap(m, scale='none', annotation_row = rdesc, annotation_col=cdesc[ , rev(c(class.variable, variable.other))], annotation_colors=cdesc.color,
            cluster_cols = cluster_cols, cluster_rows=cluster_rows, filename=filename, show_rownames=show_rownames,
            breaks=breaks,
@@ -1335,15 +1337,12 @@ nmf.post.processing <- function(ws,                       ## filename of R-works
       
     }
     s.acc.gn.anno <- s.acc.gn
-
     ## ################################################################
     if(opt$gene_col %in% colnames(rdesc)){
-
       ## add description and enzyme codes
-      s.acc.gn.anno <- lapply( s.acc.gn, function(x)
+      s.acc.gn.anno <- lapply( s.acc.gn, function(x){
         AnnotationDbi::select(eval(parse(text=paste0("org.",org.id,".eg.db"))), keys=x$SYMBOL , column=c( 'GENENAME',  'ENZYME'), keytype='SYMBOL', multiVals='first')
-      )
-
+      })
       ## add cytoband
       map <- org.Hs.egMAP
       map.genes <- mappedkeys(map)
@@ -1373,7 +1372,6 @@ nmf.post.processing <- function(ws,                       ## filename of R-works
         data.frame(SYMBOL=x$SYMBOL, ENTREZID=entrez.id, CYTOBAND=cytoband)
         
       })
-      
       ## join in a single data frame
       for(i in 1:length(s.acc)){
         #tmp <- merge(s.acc.gn[[i]], s.acc.gn.anno.cyto[[i]], 'SYMBOL' )
@@ -1559,15 +1557,20 @@ nmf.post.processing <- function(ws,                       ## filename of R-works
 
       if( !is.null(nrow(m))){
 
-        ## plot pdf
-        pdf(paste('5.',cc-1,'_ComplexHeatmap_expression_C', i, '.pdf', sep=''), 13, 12)
-        hm.list[[cc]] <- MyComplexHeatmap(m, cdesc, cdesc.color, class.variable, variable.other, max.val) #, row_title=paste0('C',i))
-        dev.off()
-
-        ## plot png
-        png(paste('5.',cc-1,'_ComplexHeatmap_expression_C', i, '.png', sep=''),  width=13, height=12, units = 'in', res=100)
-        draw(hm.list[[cc]]$hm.anno)
-        dev.off()
+        check <- tryCatch({
+          ## plot pdf
+          pdf(paste('5.',cc-1,'_ComplexHeatmap_expression_C', i, '.pdf', sep=''), 13, 12)
+          hm.list[[cc]] <- MyComplexHeatmap(m, cdesc, cdesc.color, class.variable, variable.other, max.val, jitter = TRUE) #, row_title=paste0('C',i))
+          dev.off()
+  
+          ## plot png
+          png(paste('5.',cc-1,'_ComplexHeatmap_expression_C', i, '.png', sep=''),  width=13, height=12, units = 'in', res=100)
+          draw(hm.list[[cc]]$hm.anno)
+          dev.off()
+        }, error=function(err){
+          print(paste("ERROR at ploting ", '5.', cc-1,'_ComplexHeatmap_expression_C', i, "L", err))
+        }
+        )
         
         ###############################################
         ## assemble GCT
@@ -1578,8 +1581,9 @@ nmf.post.processing <- function(ws,                       ## filename of R-works
         gct@cid <- colnames(m)
         gct@rid <- rownames(m)
         write.gct(gct, ofile = as.character(glue("5.{cc-1}_data_matrix_C{i}")))
-        
-        names(hm.list)[cc] <- i
+        check <- tryCatch({
+          names(hm.list)[cc] <- i
+        })
         cc <- cc + 1
         
       } # end !is.null(nrow(m))
@@ -1587,22 +1591,26 @@ nmf.post.processing <- function(ws,                       ## filename of R-works
     }
     #############################
     ## concatenate heatmaps
-    if(length(hm.list) > 1){
-      hm.concat <- hm.list[[1]]$hm.anno
-      
-      for(i in 2:length(hm.list))
-        hm.concat <- hm.concat %v% hm.list[[i]]$hm.noanno
-      
-      ## draw heatmap
-      pdf('6.0_ComplexHeatmap_ALL_features-concat.pdf', 16, 16)
-      draw(hm.concat, annotation_legend_side='bottom')
-      dev.off()
-      
-      png('6.0_ComplexHeatmap_ALL_features-concat.png', width=16, height=16, units = 'in', res=100)
-      draw(hm.concat, annotation_legend_side='bottom')
-      dev.off()
-      
-    }
+    check <- tryCatch({
+      if(length(hm.list) > 1){
+        hm.concat <- hm.list[[1]]$hm.anno
+        
+        for(i in 2:length(hm.list))
+          hm.concat <- hm.concat %v% hm.list[[i]]$hm.noanno
+        
+        ## draw heatmap
+        pdf('6.0_ComplexHeatmap_ALL_features-concat.pdf', 16, 16)
+        draw(hm.concat, annotation_legend_side='bottom')
+        dev.off()
+        
+        png('6.0_ComplexHeatmap_ALL_features-concat.png', width=16, height=16, units = 'in', res=100)
+        draw(hm.concat, annotation_legend_side='bottom')
+        dev.off()
+        
+      }
+    }, error=function(err){
+      print(paste("ERROR at ploting ", '6.0_ComplexHeatmap_ALL_features-concat: ', err))
+    })
     ## ############################################################
     ##
     ##                plot ALL markers
