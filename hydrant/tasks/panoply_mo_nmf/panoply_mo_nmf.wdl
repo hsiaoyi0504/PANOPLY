@@ -52,7 +52,7 @@ task panoply_mo_nmf {
 		}
 
 	runtime {
-		docker : "broadcptacdev/panoply_mo_nmf:@sha256:ef69b89499997db51a674323cf670fe29927c25a5679fbc42dfcd9a271b8ed88"
+		docker : "broadcptacdev/panoply_mo_nmf@sha256:ef69b89499997db51a674323cf670fe29927c25a5679fbc42dfcd9a271b8ed88"
 		memory : select_first ([memory, 64]) + "GB"
 		disks : "local-disk " + select_first ([disk_space, 20]) + " HDD"
 		cpu : select_first ([num_threads, 32]) + ""
